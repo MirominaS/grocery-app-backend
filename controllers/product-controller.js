@@ -1,28 +1,33 @@
 import { product_data } from "../models/product-models.js";
+import { pool } from '../config/db-config.js';
 import { errorLogger, logger } from "../utils/loggers.js"
 
-export const getProductsController = (req,res) => {
+export const getProductsController = async (req,res) => {
     try {
         logger("Fetching Products..")
 
         const {search, category} = req.query;
 
-        let filtered_products = product_data;
+        let result;
 
-        if(search) {
-            filtered_products = filtered_products.filter(
-                (product) => product.name.toLowerCase().includes(search.toLowerCase()) 
+        if(search && category) {
+            result = await pool.query(`select * from product_details.products where name ilike $1 and category ilike $2`,
+                [`%${search}%`, category]
             )
-        }
-
-        if (category) {
-            filtered_products = filtered_products.filter(
-                (product) => product.category.toLowerCase() === category.toLowerCase()
+        } else if(search) {
+            result = await pool.query(`select * from product_details.products where name ilike $1`,
+                [`%${search}%`]
             )
+        } else if(category) {
+            result = await pool.query(`select * from product_details.products where category ilike $1`,
+                [category]
+            )
+        } else {
+            result = await pool.query(`select * from product_details.products`)
         }
 
         return res.status(200).json({
-            data: filtered_products,
+            data: result.rows,
             message:"Products fetched successfully",
             success: true
         })
