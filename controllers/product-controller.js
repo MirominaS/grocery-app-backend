@@ -5,24 +5,27 @@ import { errorLogger, logger } from "../utils/loggers.js"
 export const getProductsController = async (req,res) => {
     try {
         logger("Fetching Products..")
-
+        
         const {search, category} = req.query;
 
         let result;
-
+        // for both search and category
         if(search && category) {
             result = await pool.query(`select * from product_details.products where name ilike $1 and category ilike $2`,
                 [`%${search}%`, category]
             )
-        } else if(search) {
+        } //for search
+        else if(search) {  
             result = await pool.query(`select * from product_details.products where name ilike $1`,
                 [`%${search}%`]
             )
-        } else if(category) {
+        } //for category
+        else if(category) {
             result = await pool.query(`select * from product_details.products where category ilike $1`,
                 [category]
             )
-        } else {
+        }//no filters
+         else {
             result = await pool.query(`select * from product_details.products`)
         }
 

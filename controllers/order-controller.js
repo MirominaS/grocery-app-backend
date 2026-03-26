@@ -2,12 +2,12 @@ import { order_data } from "../models/order-models.js";
 import { product_data } from "../models/product-models.js";
 import { errorLogger, logger } from "../utils/loggers.js";
 import { pool } from '../config/db-config.js';
-
+//create order 
 export const createOrderController = async (req, res) => {
     try {
         const {customer_name, phone_no, address, items} = req.body;
         
-        if(!customer_name || !phone_no || !address || !items) {
+        if(!customer_name || !phone_no || !address || !items) { //require all fields 
             return res.status(400).json({
                 error: "Missing required fields"
             })
@@ -15,8 +15,8 @@ export const createOrderController = async (req, res) => {
 
         let total = 0;
 
-        await pool.query("begin")
-
+        await pool.query("begin") //sql transaction start
+        //validate stock 
         for (let item of items) {
             const result = await pool.query("select * from product_details.products where id = $1",
                 [item.product_id]
@@ -26,13 +26,15 @@ export const createOrderController = async (req, res) => {
             }
 
             const product = result.rows[0];
-            
+            //prevent order more than the stock
             if(item.quantity > product.stock) {
                 throw new Error(`Not enough stock for ${product.name}`)
             }
-
+            
+            //total price DB
             total += product.price * item.quantity
 
+            //insert orders into orders table
             const order_result = await pool.query(
                 `insert into order_details.orders (customer_name,phone_no, address, total) values ($1,$2,$3,$4) returning id`,
                 [customer_name,phone_no,address, total]
@@ -40,13 +42,14 @@ export const createOrderController = async (req, res) => {
 
             const order_id = order_result.rows[0].id;
 
+            //each item into order_items
             for(let item of items) {
                 await pool.query(
                     `insert into order_details.order_items (order_id,product_id,quantity) values ($1,$2,$3)`,
                     [order_id,item.product_id,item.quantity]
                 )
             }
-
+            //save changes in db 
             await pool.query("commit")
 
             logger("Order Created successfully")
@@ -58,7 +61,7 @@ export const createOrderController = async (req, res) => {
             })
         }        
     } catch (error) {
-        await pool.query("rollback")
+        await pool.query("rollback") //if any step fails,undo database changes
 
         errorLogger(error.message)
 
@@ -70,7 +73,7 @@ export const createOrderController = async (req, res) => {
         
     }
 }
-
+//get order - admin
 export const getOrdersController = async (req, res) => {
     try {
         logger("Fetching all orders")
@@ -98,6 +101,7 @@ export const getOrdersController = async (req, res) => {
 
             result.rows.forEach (row => {
                 let order = orders.find(or => or.id === row.order_id)
+                //create base order object for new order
                 if(!order){
                     order = {
                         id: row.order_id,
@@ -110,7 +114,7 @@ export const getOrdersController = async (req, res) => {
                     }
                     orders.push(order)
                 }
-
+                //push into current order's items array
                if(row.product_id) {
                 order.items.push({
                     product_id: row.product_id,
