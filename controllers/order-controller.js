@@ -1,8 +1,9 @@
 import { order_data } from "../models/order-models.js";
 import { product_data } from "../models/product-models.js";
 import { errorLogger, logger } from "../utils/loggers.js";
+import { pool } from '../config/db-config.js';
 
-export const createOrderController = (req, res) => {
+export const createOrderController = async (req, res) => {
     try {
         const {customer_name, phone_no, address, items} = req.body;
         
@@ -14,46 +15,51 @@ export const createOrderController = (req, res) => {
 
         let total = 0;
 
-        const detailed_items = items.map((item) => {
-            const product_detail = product_data.find((product) => product.id === item.product_id)
+        await pool.query("begin")
 
-            if(!product_detail) {
+        for (let item of items) {
+            const result = await pool.query("select * from product_details.products where id = $1",
+                [item.product_id]
+            )
+            if(result.rows.length === 0) {
                 throw new Error(`Product with id ${item.product_id} not found`)
             }
 
-            if(item.quantity > product_detail.stock) {
-                throw new Error(`Not enough stock for ${product_detail.name}`)
+            const product = result.rows[0];
+            
+            if(item.quantity > product.stock) {
+                throw new Error(`Not enough stock for ${product.name}`)
             }
 
-            total += product_detail.price * item.quantity
+            total += product.price * item.quantity
 
-            return {
-                product_id: item.product_id,
-                quantity: item.quantity
+            const order_result = await pool.query(
+                `insert into order_details.orders (customer_name,phone_no, address, total) values ($1,$2,$3,$4) returning id`,
+                [customer_name,phone_no,address, total]
+            )
+
+            const order_id = order_result.rows[0].id;
+
+            for(let item of items) {
+                await pool.query(
+                    `insert into order_details.order_items (order_id,product_id,quantity) values ($1,$2,$3)`,
+                    [order_id,item.product_id,item.quantity]
+                )
             }
-        })
 
-        const new_order = {
-            id: order_data.length +1,
-            customer_name,
-            phone_no,
-            address,
-            total,
-            items:detailed_items,
-            created_at: new Date()
-        }
+            await pool.query("commit")
 
-        order_data.push(new_order);
+            logger("Order Created successfully")
 
-        logger("Order Created Successfully")
-
-        return res.status(201).json({
-                data: new_order,
-                message:"Order created successfully",
+            return res.status(201).json({
+                data: {order_id,total},
+                message: "Order created successfully",
                 success: true
-        })
-        
+            })
+        }        
     } catch (error) {
+        await pool.query("rollback")
+
         errorLogger(error.message)
 
         return res.status(400).json({
@@ -65,15 +71,63 @@ export const createOrderController = (req, res) => {
     }
 }
 
-export const getOrdersController = (req, res) => {
+export const getOrdersController = async (req, res) => {
     try {
         logger("Fetching all orders")
 
-        return res.status(200).json({
-            data:order_data,
-            message:"Orders fetched successfully",
-            success:true
-        })
+        const result = await pool.query(
+            `select 
+                o.id as order_id,
+                o.customer_name,
+                o.phone_no,
+                o.address,
+                o.total,
+                o.created_at,
+                oi.product_id,
+                oi.quantity,
+                p.name as product_name,
+                p.price as product_price,
+                p.category as product_category,
+                p.image_url as product_image
+            from order_details.orders o
+            left join order_details.order_items oi on o.id = oi.order_id
+            left join product_details.products p on oi.product_id = p.id
+            order by o.created_at desc, o.id, oi.id`)
+
+            const orders = [];
+
+            result.rows.forEach (row => {
+                let order = orders.find(or => or.id === row.order_id)
+                if(!order){
+                    order = {
+                        id: row.order_id,
+                        customer_name: row.customer_name,
+                        phone_no: row.phone_no,
+                        address: row.address,
+                        total: row.total,
+                        created_at: row.created_at,
+                        items: []
+                    }
+                    orders.push(order)
+                }
+
+               if(row.product_id) {
+                order.items.push({
+                    product_id: row.product_id,
+                    name: row.product_name,
+                    price: row.product_price,
+                    category: row.product_category,
+                    image: row.product_image,
+                    quantity: row.quantity
+                })
+               }
+            })
+
+            return res.status(200).json({
+                data: orders,
+                message: "Orders fetched successfully",
+                success: true
+            })
         
     } catch (error) {
         errorLogger(error.message)
