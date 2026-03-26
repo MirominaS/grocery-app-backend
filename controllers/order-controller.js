@@ -64,3 +64,24 @@ export const createOrderController = (req, res) => {
         
     }
 }
+
+export const getOrdersController = (req, res) => {
+    try {
+        logger("Fetching all orders")
+
+        return res.status(200).json({
+            data:order_data,
+            message:"Orders fetched successfully",
+            success:true
+        })
+        
+    } catch (error) {
+        errorLogger(error.message)
+
+        return res.status(500).json({
+            data: null,
+            message:error.message,
+            success:false
+        })
+    }
+}
