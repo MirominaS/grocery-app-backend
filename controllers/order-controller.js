@@ -14,6 +14,7 @@ export const createOrderController = async (req, res) => {
         }
 
         let total = 0;
+        const validatedItems = []
 
         await pool.query("begin") //sql transaction start
         //validate stock 
@@ -32,8 +33,13 @@ export const createOrderController = async (req, res) => {
             }
             
             //total price DB
-            total += product.price * item.quantity
+            total += Number(product.price) * item.quantity
 
+            validatedItems.push({
+                id: item.product_id,
+                qty: item.quantity
+            })
+        }
             //insert orders into orders table
             const order_result = await pool.query(
                 `insert into order_details.orders (customer_name,phone_no, address, total) values ($1,$2,$3,$4) returning id`,
@@ -43,10 +49,10 @@ export const createOrderController = async (req, res) => {
             const order_id = order_result.rows[0].id;
 
             //each item into order_items
-            for(let item of items) {
+            for(let vItem of validatedItems) {
                 await pool.query(
                     `insert into order_details.order_items (order_id,product_id,quantity) values ($1,$2,$3)`,
-                    [order_id,item.product_id,item.quantity]
+                    [order_id,vItem.id,vItem.qty]
                 )
             }
             //save changes in db 
@@ -59,7 +65,7 @@ export const createOrderController = async (req, res) => {
                 message: "Order created successfully",
                 success: true
             })
-        }        
+              
     } catch (error) {
         await pool.query("rollback") //if any step fails,undo database changes
 
