@@ -33,6 +33,60 @@ The backend is built using **Node.js (Express)** and **PostgreSQL**.
 
 ---
 
+ ## Architecture Overview
+
+This project follows a **simple full-stack architecture** with a clear separation between frontend and backend.
+
+---
+
+### Frontend (React + Vite)
+
+- Built using React with a component-based structure
+- Pages are separated into:
+  - Home (product listing)
+  - Cart
+  - Checkout
+  - Admin 
+- Reusable components are used to keep the UI modular
+- State management is handled using `useState` and props 
+- API calls are abstracted into a separate `/api` layer
+
+---
+
+### Backend (Node.js + Express)
+
+- RESTful API built using Express
+- Follows a layered structure:
+  - Routes → handle endpoints
+  - Controllers → handle business logic
+  - Config → database connection
+- Handles:
+  - Product fetching 
+  - Order creation 
+  - Order retrieval
+
+---
+### Database (PostgreSQL)
+
+- Relational database design with normalized structure:
+  - `products` → stores product data
+  - `orders` → stores order details
+  - `order_items` → stores items per order
+- Supports one-to-many relationship between orders and products
+- Ensures data consistency using transactions during order creation
+
+---
+
+### Data Flow
+
+1. Frontend sends API request
+2. Backend processes request and queries database
+3. Database returns data to backend
+4. Backend sends JSON response to frontend
+5. Frontend updates UI accordingly
+---
+
+
 ## Project Structure
 ```
 grocery-app-backend/
@@ -61,6 +115,12 @@ grocery-app-backend/
 ```
 
 ---
+
+## Clone repository
+```bash
+git clone https://github.com/MirominaS/grocery-app-backend.git
+cd grocery-app
+```
 
 
 ##  Database Schema
