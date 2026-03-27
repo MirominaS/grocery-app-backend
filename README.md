@@ -16,7 +16,7 @@ The backend is built using **Node.js (Express)** and **PostgreSQL**.
 - Search products by name
 - Filter products by category
 
-### 🛍 Orders
+### Orders
 - Create a new order
 - Validate product availability (stock check)
 - Store order details and items
