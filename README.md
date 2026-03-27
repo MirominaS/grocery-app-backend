@@ -248,7 +248,7 @@ npm install
 ## Start Server
 
 ```
-npm start
+npm run server
 ```
 
 ## Server will run at
